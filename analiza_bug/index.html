@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="initial-scale=1,user-scalable=no,maximum-scale=1,width=device-width">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <link rel="stylesheet" href="css/leaflet.css">
+        <link rel="stylesheet" href="css/L.Control.Layers.Tree.css">
+        <link rel="stylesheet" href="css/L.Control.Locate.min.css">
+        <link rel="stylesheet" href="css/qgis2web.css">
+        <link rel="stylesheet" href="css/fontawesome-all.min.css">
+        <link rel="stylesheet" href="css/leaflet-control-geocoder.Geocoder.css">
+        <link rel="stylesheet" href="css/leaflet-measure.css">
+        <style>
+        html, body, #map {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        </style>
+        <title></title>
+    </head>
+    <body>
+        <div id="map">
+        </div>
+        <script src="js/qgis2web_expressions.js"></script>
+        <script src="js/leaflet.js"></script>
+        <script src="js/L.Control.Layers.Tree.min.js"></script>
+        <script src="js/L.Control.Locate.min.js"></script>
+        <script src="js/leaflet.rotatedMarker.js"></script>
+        <script src="js/leaflet.pattern.js"></script>
+        <script src="js/leaflet-hash.js"></script>
+        <script src="js/Autolinker.min.js"></script>
+        <script src="js/rbush.min.js"></script>
+        <script src="js/labelgun.min.js"></script>
+        <script src="js/labels.js"></script>
+        <script src="js/leaflet-tilelayer-wmts.js"></script>
+        <script src="js/leaflet-control-geocoder.Geocoder.js"></script>
+        <script src="js/leaflet-measure.js"></script>
+        <script src="data/przebiegrzekiz1940roku_1.js"></script>
+        <script src="data/przebiegrzekiz1990roku_2.js"></script>
+        <script src="data/przebiegrzekiz2024roku_3.js"></script>
+        <script src="data/miejscagdzierzekapynaprzynajmniejraz_4.js"></script>
+        <script src="data/miejscagdzierzekazawszepyna_5.js"></script>
+        <script src="data/procetowezmianywudzialerzekimidzylatami1990i1940_6.js"></script>
+        <script src="data/procentowezmianywudzialerzekimidzylatami2024i1990_7.js"></script>
+        <script>
+        var highlightLayer;
+        function highlightFeature(e) {
+            highlightLayer = e.target;
+
+            if (e.target.feature.geometry.type === 'LineString' || e.target.feature.geometry.type === 'MultiLineString') {
+              highlightLayer.setStyle({
+                color: '#ffff00',
+              });
+            } else {
+              highlightLayer.setStyle({
+                fillColor: '#ffff00',
+                fillOpacity: 1
+              });
+            }
+        }
+        var map = L.map('map', {
+            zoomControl:false, maxZoom:28, minZoom:1
+        })
+        var hash = new L.Hash(map);
+        map.attributionControl.setPrefix('<a href="https://github.com/tomchadwin/qgis2web" target="_blank">qgis2web</a> &middot; <a href="https://leafletjs.com" title="A JS library for interactive maps">Leaflet</a> &middot; <a href="https://qgis.org">QGIS</a>');
+        var autolinker = new Autolinker({truncate: {length: 30, location: 'smart'}});
+        // remove popup's row if "visible-with-data"
+        function removeEmptyRowsFromPopupContent(content, feature) {
+         var tempDiv = document.createElement('div');
+         tempDiv.innerHTML = content;
+         var rows = tempDiv.querySelectorAll('tr');
+         for (var i = 0; i < rows.length; i++) {
+             var td = rows[i].querySelector('td.visible-with-data');
+             var key = td ? td.id : '';
+             if (td && td.classList.contains('visible-with-data') && feature.properties[key] == null) {
+                 rows[i].parentNode.removeChild(rows[i]);
+             }
+         }
+         return tempDiv.innerHTML;
+        }
+        // add class to format popup if it contains media
+		function addClassToPopupIfMedia(content, popup) {
+			var tempDiv = document.createElement('div');
+			tempDiv.innerHTML = content;
+			if (tempDiv.querySelector('td img')) {
+				popup._contentNode.classList.add('media');
+					// Delay to force the redraw
+					setTimeout(function() {
+						popup.update();
+					}, 10);
+			} else {
+				popup._contentNode.classList.remove('media');
+			}
+		}
+        var zoomControl = L.control.zoom({
+            position: 'topleft'
+        }).addTo(map);
+        L.control.locate({locateOptions: {maxZoom: 19}}).addTo(map);
+        var measureControl = new L.Control.Measure({
+            position: 'topleft',
+            primaryLengthUnit: 'meters',
+            secondaryLengthUnit: 'kilometers',
+            primaryAreaUnit: 'sqmeters',
+            secondaryAreaUnit: 'hectares'
+        });
+        measureControl.addTo(map);
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].innerHTML = '';
+        document.getElementsByClassName('leaflet-control-measure-toggle')[0].className += ' fas fa-ruler';
+        var bounds_group = new L.featureGroup([]);
+        function setBounds() {
+            if (bounds_group.getLayers().length) {
+                map.fitBounds(bounds_group.getBounds());
+            }
+        }
+        map.createPane('pane_ORTOFOTOMAPA_0');
+        map.getPane('pane_ORTOFOTOMAPA_0').style.zIndex = 400;
+        var layer_ORTOFOTOMAPA_0 = L.tileLayer.wmts('https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMTS/StandardResolution', {
+            pane: 'pane_ORTOFOTOMAPA_0',
+            layer: 'ORTOFOTOMAPA',
+            tilematrixSet: 'EPSG:2180',
+            format: 'image/jpeg',
+            style: 'default',
+            uppercase: true,
+            transparent: true,
+            continuousWorld : true,
+            opacity: 1.0,
+            attribution: '',
+        });
+        map.addLayer(layer_ORTOFOTOMAPA_0);
+        function pop_przebiegrzekiz1940roku_1(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td class="visible-with-data" id="Shape_Leng"colspan="2"><strong>Shape_Leng</strong><br />' + (feature.properties['Shape_Leng'] !== null ? autolinker.link(feature.properties['Shape_Leng'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td class="visible-with-data" id="Shape_Area"colspan="2"><strong>Shape_Area</strong><br />' + (feature.properties['Shape_Area'] !== null ? autolinker.link(feature.properties['Shape_Area'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_przebiegrzekiz1940roku_1_0() {
+            return {
+                pane: 'pane_przebiegrzekiz1940roku_1',
+                opacity: 1,
+                color: 'rgba(35,35,35,0.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(168,237,247,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_przebiegrzekiz1940roku_1');
+        map.getPane('pane_przebiegrzekiz1940roku_1').style.zIndex = 401;
+        map.getPane('pane_przebiegrzekiz1940roku_1').style['mix-blend-mode'] = 'normal';
+        var layer_przebiegrzekiz1940roku_1 = new L.geoJson(json_przebiegrzekiz1940roku_1, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_przebiegrzekiz1940roku_1',
+            layerName: 'layer_przebiegrzekiz1940roku_1',
+            pane: 'pane_przebiegrzekiz1940roku_1',
+            onEachFeature: pop_przebiegrzekiz1940roku_1,
+            style: style_przebiegrzekiz1940roku_1_0,
+        });
+        bounds_group.addLayer(layer_przebiegrzekiz1940roku_1);
+        map.addLayer(layer_przebiegrzekiz1940roku_1);
+        function pop_przebiegrzekiz1990roku_2(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td class="visible-with-data" id="Shape_Leng"colspan="2"><strong>Shape_Leng</strong><br />' + (feature.properties['Shape_Leng'] !== null ? autolinker.link(feature.properties['Shape_Leng'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td class="visible-with-data" id="Shape_Area"colspan="2"><strong>Shape_Area</strong><br />' + (feature.properties['Shape_Area'] !== null ? autolinker.link(feature.properties['Shape_Area'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_przebiegrzekiz1990roku_2_0() {
+            return {
+                pane: 'pane_przebiegrzekiz1990roku_2',
+                opacity: 1,
+                color: 'rgba(35,35,35,0.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(120,179,230,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_przebiegrzekiz1990roku_2');
+        map.getPane('pane_przebiegrzekiz1990roku_2').style.zIndex = 402;
+        map.getPane('pane_przebiegrzekiz1990roku_2').style['mix-blend-mode'] = 'normal';
+        var layer_przebiegrzekiz1990roku_2 = new L.geoJson(json_przebiegrzekiz1990roku_2, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_przebiegrzekiz1990roku_2',
+            layerName: 'layer_przebiegrzekiz1990roku_2',
+            pane: 'pane_przebiegrzekiz1990roku_2',
+            onEachFeature: pop_przebiegrzekiz1990roku_2,
+            style: style_przebiegrzekiz1990roku_2_0,
+        });
+        bounds_group.addLayer(layer_przebiegrzekiz1990roku_2);
+        map.addLayer(layer_przebiegrzekiz1990roku_2);
+        function pop_przebiegrzekiz2024roku_3(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td class="visible-with-data" id="Shape_Leng"colspan="2"><strong>Shape_Leng</strong><br />' + (feature.properties['Shape_Leng'] !== null ? autolinker.link(feature.properties['Shape_Leng'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td class="visible-with-data" id="Shape_Area"colspan="2"><strong>Shape_Area</strong><br />' + (feature.properties['Shape_Area'] !== null ? autolinker.link(feature.properties['Shape_Area'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_przebiegrzekiz2024roku_3_0() {
+            return {
+                pane: 'pane_przebiegrzekiz2024roku_3',
+                opacity: 1,
+                color: 'rgba(255,255,255,0.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(46,70,192,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_przebiegrzekiz2024roku_3');
+        map.getPane('pane_przebiegrzekiz2024roku_3').style.zIndex = 403;
+        map.getPane('pane_przebiegrzekiz2024roku_3').style['mix-blend-mode'] = 'normal';
+        var layer_przebiegrzekiz2024roku_3 = new L.geoJson(json_przebiegrzekiz2024roku_3, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_przebiegrzekiz2024roku_3',
+            layerName: 'layer_przebiegrzekiz2024roku_3',
+            pane: 'pane_przebiegrzekiz2024roku_3',
+            onEachFeature: pop_przebiegrzekiz2024roku_3,
+            style: style_przebiegrzekiz2024roku_3_0,
+        });
+        bounds_group.addLayer(layer_przebiegrzekiz2024roku_3);
+        map.addLayer(layer_przebiegrzekiz2024roku_3);
+        function pop_miejscagdzierzekapynaprzynajmniejraz_4(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td class="visible-with-data" id="Shape_Leng"colspan="2"><strong>Shape_Leng</strong><br />' + (feature.properties['Shape_Leng'] !== null ? autolinker.link(feature.properties['Shape_Leng'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td class="visible-with-data" id="Shape_Area"colspan="2"><strong>Shape_Area</strong><br />' + (feature.properties['Shape_Area'] !== null ? autolinker.link(feature.properties['Shape_Area'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_miejscagdzierzekapynaprzynajmniejraz_4_0() {
+            return {
+                pane: 'pane_miejscagdzierzekapynaprzynajmniejraz_4',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(167,188,255,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_miejscagdzierzekapynaprzynajmniejraz_4');
+        map.getPane('pane_miejscagdzierzekapynaprzynajmniejraz_4').style.zIndex = 404;
+        map.getPane('pane_miejscagdzierzekapynaprzynajmniejraz_4').style['mix-blend-mode'] = 'normal';
+        var layer_miejscagdzierzekapynaprzynajmniejraz_4 = new L.geoJson(json_miejscagdzierzekapynaprzynajmniejraz_4, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_miejscagdzierzekapynaprzynajmniejraz_4',
+            layerName: 'layer_miejscagdzierzekapynaprzynajmniejraz_4',
+            pane: 'pane_miejscagdzierzekapynaprzynajmniejraz_4',
+            onEachFeature: pop_miejscagdzierzekapynaprzynajmniejraz_4,
+            style: style_miejscagdzierzekapynaprzynajmniejraz_4_0,
+        });
+        bounds_group.addLayer(layer_miejscagdzierzekapynaprzynajmniejraz_4);
+        map.addLayer(layer_miejscagdzierzekapynaprzynajmniejraz_4);
+        function pop_miejscagdzierzekazawszepyna_5(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td class="visible-with-data" id="Shape_Leng"colspan="2"><strong>Shape_Leng</strong><br />' + (feature.properties['Shape_Leng'] !== null ? autolinker.link(feature.properties['Shape_Leng'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                    <tr>\
+                        <td class="visible-with-data" id="Shape_Area"colspan="2"><strong>Shape_Area</strong><br />' + (feature.properties['Shape_Area'] !== null ? autolinker.link(feature.properties['Shape_Area'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_miejscagdzierzekazawszepyna_5_0() {
+            return {
+                pane: 'pane_miejscagdzierzekazawszepyna_5',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(76,85,186,1.0)',
+                interactive: true,
+            }
+        }
+        map.createPane('pane_miejscagdzierzekazawszepyna_5');
+        map.getPane('pane_miejscagdzierzekazawszepyna_5').style.zIndex = 405;
+        map.getPane('pane_miejscagdzierzekazawszepyna_5').style['mix-blend-mode'] = 'normal';
+        var layer_miejscagdzierzekazawszepyna_5 = new L.geoJson(json_miejscagdzierzekazawszepyna_5, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_miejscagdzierzekazawszepyna_5',
+            layerName: 'layer_miejscagdzierzekazawszepyna_5',
+            pane: 'pane_miejscagdzierzekazawszepyna_5',
+            onEachFeature: pop_miejscagdzierzekazawszepyna_5,
+            style: style_miejscagdzierzekazawszepyna_5_0,
+        });
+        bounds_group.addLayer(layer_miejscagdzierzekazawszepyna_5);
+        map.addLayer(layer_miejscagdzierzekazawszepyna_5);
+        function pop_procetowezmianywudzialerzekimidzylatami1990i1940_6(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td class="visible-with-data" id="vmap_his"colspan="2"><strong>vmap_his</strong><br />' + (feature.properties['vmap_his'] !== null ? autolinker.link(feature.properties['vmap_his'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_procetowezmianywudzialerzekimidzylatami1990i1940_6_0(feature) {
+            switch(String(feature.properties['vmap_his'])) {
+                case '[-97.2569, -84.7133, -78.2728, -77.0622, -75.514, -73.5619, -72.6872, -72.5596, -70.32, -69.6717, -68.1851, -66.921, -63.8689, -63.201, -61.8727, -61.1019, -60.1546, -60.081]':
+                    return {
+                pane: 'pane_procetowezmianywudzialerzekimidzylatami1990i1940_6',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(234,51,51,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '[-59.9078, -59.2281, -59.1134, -57.468, -56.8804, -56.6027, -55.8702, -54.7303, -53.5668, -53.4588, -52.9731, -52.6463, -52.084, -51.731, -51.4685, -50.7784, -50.5675, -50.37, -50.3654, -50.3572, -50.2605, -49.837, -49.7295, -49.6, -48.7139, -48.4674, -48.0832, -47.3627, -47.2166, -46.9887, -46.9767, -46.2658, -46.0204, -45.6197, -45.5934, -45.1299, -44.8599, -44.6618, -44.1625, -44.0248, -43.8126, -43.8061, -43.6572, -43.5711, -43.2588, -43.1194, -43.0089, -42.9732, -42.9622, -42.3903, -41.7951, -41.7435, -41.4001, -41.2587, -40.5772, -40.4554, -40.1607, -40.0195, -39.8964, -39.8806, -39.8402, -39.1931, -38.6273, -38.4442, -38.4136, -37.5934, -37.487, -37.1701, -37.0843, -37.0539, -36.2891, -35.733, -35.6011, -35.4196, -35.2345, -34.9872, -34.8189, -34.2837, -34.2637, -34.1177, -33.7478, -33.503, -33.2706, -33.0793, -32.9707, -32.891, -32.4765, -32.2334, -32.023, -31.6138, -30.9771, -30.8468, -30.4945, -30.3912, -30.2384, -30.212, -30.185, -30.0412, -29.8517, -29.7604, -29.6102, -29.5714, -29.4072, -29.3439, -29.3386, -28.9447, -28.8302, -28.634, -28.066, -27.8023, -27.7412, -27.6975, -27.6138, -27.589, -27.4424, -27.0832, -26.9805, -26.8377, -26.8151, -26.7235, -26.6673, -26.6282, -26.6164, -26.5174, -26.4703, -26.4013, -26.3811, -26.265, -26.1863, -26.0452, -25.9801, -25.9764, -25.9213, -25.6381, -25.449, -25.3858, -24.9873, -24.8402, -24.7238, -24.4432, -24.3622, -24.043, -23.9447, -23.7655, -23.7193, -23.6198, -23.608, -23.5805, -23.5571, -23.548, -23.504, -23.4705, -23.3127, -23.2983, -23.0991, -22.8412, -22.8108, -22.0281, -21.9424, -21.8542, -21.6542, -21.525, -21.123, -21.05, -20.7941, -20.691, -20.5213, -20.3915, -20.276, -20.2131, -20.1095, -20.0449]':
+                    return {
+                pane: 'pane_procetowezmianywudzialerzekimidzylatami1990i1940_6',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(245,175,18,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '[-19.9851, -19.6673, -19.6511, -19.6285, -19.6258, -19.5385, -19.4899, -19.3067, -19.2848, -18.8903, -18.7432, -18.7026, -18.6435, -18.643, -18.6109, -18.5488, -18.5266, -18.4018, -18.3615, -18.3436, -18.3217, -18.2986, -18.2925, -18.2438, -18.1298, -17.7188, -17.4305, -17.3568, -17.2274, -17.1324, -17.0057, -16.9517, -16.8112, -16.809, -16.7505, -16.6081, -16.5521, -16.5141, -16.5042, -16.2256, -16.0685, -15.9752, -15.9697, -15.7177, -15.6546, -15.6294, -15.5481, -15.5067, -15.4801, -15.4221, -15.4069, -15.3022, -15.1403, -15.1319, -15.0488, -15.025, -14.9199, -14.6888, -14.6154, -14.6013, -14.4855, -14.086, -13.9186, -13.909, -13.8861, -13.8851, -13.5188, -13.4936, -13.4744, -13.4361, -13.4259, -13.2888, -13.2113, -13.1853, -13.1417, -13.0917, -12.9351, -12.8713, -12.7743, -12.715, -12.6991, -12.321, -12.2199, -12.1077, -12.0692, -12.0443, -11.9574, -11.85, -11.8474, -11.6237, -11.4669, -11.4059, -11.3014, -11.2557, -11.2484, -11.1588, -11.0816, -11.0678, -11.0128, -10.9017, -10.8008, -10.7844, -10.7384, -10.6911, -10.6755, -10.643, -10.5587, -10.4852, -10.4765, -10.4167, -10.34, -10.0975, -9.97348, -9.7513, -9.67326, -9.58887, -9.36366, -9.32443, -9.30897, -9.08163, -8.95802, -8.9566, -8.91178, -8.84006, -8.70468, -8.52908, -8.4929, -8.47564, -8.39921, -8.18456, -8.165, -8.15504, -8.10207, -8.01618, -7.95321, -7.86314, -7.861, -7.8148, -7.80461, -7.7828, -7.69817, -7.69323, -7.691, -7.68803, -7.49571, -7.49175, -7.34218, -7.28075, -7.1497, -7.05496, -7.0236, -6.96585, -6.90737, -6.84881, -6.83573, -6.76802, -6.74424, -6.65729, -6.65616, -6.55397, -6.52875, -6.36324, -6.36292, -6.31631, -6.28712, -6.07617, -6.00992, -5.94636, -5.67869, -5.59837, -5.57969, -5.4876, -5.46223, -5.4239, -5.40533, -5.36588, -5.28574, -5.20782, -5.09666, -5.0352, -5.02419, -5.005, -4.99383, -4.93496, -4.87705, -4.69428, -4.68219, -4.59554, -4.57837, -4.46485, -4.44421, -4.42524, -4.35787, -4.2733, -4.22235, -4.17662, -4.1505, -4.03485, -4.01262, -3.98768, -3.95046, -3.89228, -3.82488, -3.77644, -3.76458, -3.69853, -3.68226, -3.56002, -3.55909, -3.20447, -3.18014, -3.11598, -3.11487, -3.09912, -3.02611, -3.00693, -2.9725, -2.85937, -2.82488, -2.78024, -2.72308, -2.61406, -2.6064, -2.60478, -2.5459, -2.54337, -2.46822, -2.40505, -2.32785, -2.29784, -2.27955, -2.1308, -2.12048, -2.11959, -2.1149, -2.08635, -2.08134, -2.01113, -1.97656, -1.92766, -1.90568, -1.80376, -1.75329, -1.61986, -1.49961, -1.43568, -1.39335, -1.35718, -1.30428, -1.27953, -1.27624, -1.21993, -1.16863, -1.15833, -1.00719, -0.946952, -0.904021, -0.900714, -0.896521, -0.728014, -0.658101, -0.652375, -0.648369, -0.567144, -0.521491, -0.511893, -0.511317, -0.370785, -0.35515, -0.340427, -0.336486, -0.312108, -0.288553, -0.270409, -0.265757, -0.265555, -0.247556, -0.244718, -0.202702, -0.107404, -0.105561, -0.100779, -0.0973415, -0.0601467, -0.0505736, -0.034566, -0.0266034, -0.000890786, -0.000310781]':
+                    return {
+                pane: 'pane_procetowezmianywudzialerzekimidzylatami1990i1940_6',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(246,236,105,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '[0.000422479, 0.00295316, 0.00341254, 0.0126358, 0.05584, 0.0603351, 0.0686854, 0.0736593, 0.0754359, 0.0846497, 0.0956053, 0.101536, 0.105429, 0.1061, 0.122933, 0.130487, 0.141117, 0.165706, 0.177122, 0.17839, 0.178845, 0.240533, 0.253195, 0.264913, 0.303315, 0.315693, 0.327465, 0.366742, 0.371099, 0.375718, 0.384891, 0.441529, 0.463964, 0.49636, 0.520523, 0.526433, 0.544519, 0.58708, 0.684871, 0.704668, 0.738413, 0.814512, 0.836949, 0.855317, 0.920226, 0.938023, 0.988552, 1.04566, 1.04924, 1.20448, 1.21722, 1.24256, 1.27186, 1.29865, 1.33791, 1.40575, 1.48262, 1.50528, 1.57677, 1.61939, 1.64599, 1.68257, 1.72475, 1.7255, 1.91546, 1.91618, 1.99303, 2.0868, 2.09806, 2.14209, 2.16741, 2.17872, 2.19733, 2.21161, 2.24323, 2.2436, 2.48619, 2.48635, 2.50039, 2.532, 2.62086, 2.72436, 2.73512, 2.97434, 2.98278, 3.00815, 3.02666, 3.05524, 3.09968, 3.10388, 3.15849, 3.17261, 3.18933, 3.19789, 3.20549, 3.31104, 3.37504, 3.40043, 3.50668, 3.60955, 3.61705, 3.71306, 3.71553, 3.72075, 3.72745, 3.72769, 3.9553, 3.97497, 3.99009, 4.04177, 4.08141, 4.1555, 4.21361, 4.25039, 4.30134, 4.4513, 4.45358, 4.4559, 4.47934, 4.51104, 4.53027, 4.53834, 4.54452, 4.57869, 4.6004, 4.6121, 4.65387, 4.66927, 4.72516, 4.76275, 4.86638, 4.88012, 4.88234, 4.95115, 4.95903, 4.96731, 5.02071, 5.07095, 5.19975, 5.35542, 5.37345, 5.38315, 5.4799, 5.4893, 5.57067, 5.61891, 5.63536, 5.74365, 5.85669, 5.93784, 5.95781, 6.21616, 6.50484, 6.51118, 6.52442, 6.64444, 7.00407, 7.21557, 7.28381, 7.40031, 7.56065, 7.63112, 7.81916, 7.93091, 8.02366, 8.09686, 8.12931, 8.32978, 8.39204, 8.39293, 8.58385, 8.6447, 8.64611, 8.65401, 8.80038, 8.81642, 8.82061, 8.82664, 9.02524, 9.03523, 9.10913, 9.19474, 9.35441, 9.40312, 9.46965, 9.48804, 9.48981, 9.50523, 9.59174, 9.69182, 9.84522, 9.86222, 10.008, 10.1277, 10.1513, 10.1669, 10.1708, 10.4724, 10.4836, 10.4962, 10.5482, 10.657, 10.6706, 10.7288, 10.7443, 10.8532, 10.8993, 10.9073, 10.9093, 10.9278, 10.9349, 11.2645, 11.2868, 11.2903, 11.3166, 11.4003, 11.5927, 11.7258, 11.8773, 12.0018, 12.1209, 12.1568, 12.1734, 12.1978, 12.2681, 12.361, 12.4705, 12.6415, 12.745, 12.8713, 13.0478, 13.174, 13.2227, 13.3623, 13.3931, 13.4203, 13.4705, 13.5198, 13.5648, 13.6516, 13.7703, 13.8228, 13.8685, 13.8866, 14.5246, 14.6503, 14.6513, 14.8182, 15.2466, 15.4206, 15.526, 15.6201, 15.6935, 15.9058, 16.0318, 16.1895, 16.3591, 16.4882, 16.5939, 16.7352, 16.7381, 16.9587, 16.9717, 16.9939, 17.1008, 17.1451, 17.1728, 17.3208, 17.3587, 17.5483, 17.613, 17.7144, 17.9979, 18.0689, 18.2805, 18.5768, 18.6402, 18.7131, 18.9712, 19.0286, 19.0847, 19.1795, 19.208, 19.2367, 19.4939, 19.6377, 19.7132, 19.7258, 19.9551]':
+                    return {
+                pane: 'pane_procetowezmianywudzialerzekimidzylatami1990i1940_6',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(118,217,233,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '[20.5853, 20.5936, 20.7538, 20.8855, 21.1781, 21.2004, 21.2968, 21.2971, 21.4678, 21.6912, 21.7422, 21.84, 21.9279, 22.0555, 22.1973, 22.2942, 22.3191, 22.3749, 22.4285, 22.4562, 22.5425, 23.0438, 23.0776, 23.1481, 23.2043, 23.2277, 23.2548, 23.6783, 24.1076, 24.1929, 24.2033, 24.3405, 24.5857, 24.6582, 24.7642, 25.0778, 25.095, 25.123, 25.1492, 25.3774, 25.5404, 25.7009, 25.7119, 25.7643, 26.1993, 26.3626, 26.3697, 26.6418, 26.6931, 27.0932, 27.3832, 27.5567, 27.5677, 27.6012, 28.4547, 28.5085, 28.7204, 28.8166, 28.8678, 29.4264, 29.7485, 29.965, 30.3561, 30.7119, 31.1853, 31.4878, 31.5127, 31.5245, 31.6533, 32.0772, 32.2558, 32.7879, 32.9389, 33.2754, 33.4417, 33.5383, 33.5481, 33.6481, 34.9142, 35.0151, 35.9702, 36.0249, 36.1262, 36.1559, 37.2579, 37.805, 37.8634, 38.0286, 38.0867, 38.1974, 38.2215, 38.519, 38.5533, 38.6721, 38.7421, 38.9028, 39.1535, 39.3029, 39.6131, 40.5881, 40.6279, 41.6474, 41.7307, 41.8498, 42.0446, 42.0984, 42.5035, 43.4842, 43.6838, 44.7238, 45.0898, 45.6245, 45.8774, 46.0218, 46.1614, 46.2469, 47.4673, 48.3733, 48.7362, 48.8498, 50.1398, 50.427, 50.4673, 52.9393, 53.2823, 53.7582, 54.3201, 55.6332, 56.4777, 58.4383, 59.119]':
+                    return {
+                pane: 'pane_procetowezmianywudzialerzekimidzylatami1990i1940_6',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(42,123,164,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '[60.2331, 60.3515, 61.8371, 62.3782, 63.6995, 67.0342, 69.1514, 70.8147, 74.106, 81.958, 86.5346, 88.9201, 90.109, 90.3875, 92.2684, 97.1144, 97.325, 99.2637, 99.8577, 99.9765, 100.0]':
+                    return {
+                pane: 'pane_procetowezmianywudzialerzekimidzylatami1990i1940_6',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(0,53,138,1.0)',
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        map.createPane('pane_procetowezmianywudzialerzekimidzylatami1990i1940_6');
+        map.getPane('pane_procetowezmianywudzialerzekimidzylatami1990i1940_6').style.zIndex = 406;
+        map.getPane('pane_procetowezmianywudzialerzekimidzylatami1990i1940_6').style['mix-blend-mode'] = 'normal';
+        var layer_procetowezmianywudzialerzekimidzylatami1990i1940_6 = new L.geoJson(json_procetowezmianywudzialerzekimidzylatami1990i1940_6, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_procetowezmianywudzialerzekimidzylatami1990i1940_6',
+            layerName: 'layer_procetowezmianywudzialerzekimidzylatami1990i1940_6',
+            pane: 'pane_procetowezmianywudzialerzekimidzylatami1990i1940_6',
+            onEachFeature: pop_procetowezmianywudzialerzekimidzylatami1990i1940_6,
+            style: style_procetowezmianywudzialerzekimidzylatami1990i1940_6_0,
+        });
+        bounds_group.addLayer(layer_procetowezmianywudzialerzekimidzylatami1990i1940_6);
+        map.addLayer(layer_procetowezmianywudzialerzekimidzylatami1990i1940_6);
+        function pop_procentowezmianywudzialerzekimidzylatami2024i1990_7(feature, layer) {
+            layer.on({
+                mouseout: function(e) {
+                    for (var i in e.target._eventParents) {
+                        if (typeof e.target._eventParents[i].resetStyle === 'function') {
+                            e.target._eventParents[i].resetStyle(e.target);
+                        }
+                    }
+                },
+                mouseover: highlightFeature,
+            });
+            var popupContent = '<table>\
+                    <tr>\
+                        <td class="visible-with-data" id="sen_m_vmap"colspan="2"><strong>sen_m_vmap</strong><br />' + (feature.properties['sen_m_vmap'] !== null ? autolinker.link(feature.properties['sen_m_vmap'].toLocaleString()) : '') + '</td>\
+                    </tr>\
+                </table>';
+            var content = removeEmptyRowsFromPopupContent(popupContent, feature);
+			layer.on('popupopen', function(e) {
+				addClassToPopupIfMedia(content, e.popup);
+			});
+			layer.bindPopup(content, { maxHeight: 400 });
+        }
+
+        function style_procentowezmianywudzialerzekimidzylatami2024i1990_7_0(feature) {
+            switch(String(feature.properties['sen_m_vmap'])) {
+                case '[-86.7898, -81.209, -71.0378, -70.2949, -65.715, -64.906, -63.1599, -60.919]':
+                    return {
+                pane: 'pane_procentowezmianywudzialerzekimidzylatami2024i1990_7',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(234,51,51,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '[-59.1555, -58.0197, -56.7462, -55.6112, -53.0608, -52.6785, -52.6344, -51.9664, -49.5837, -47.9481, -47.6182, -47.5812, -47.1503, -46.1916, -45.6459, -45.5296, -45.2575, -43.1845, -42.2933, -41.9186, -41.899, -41.6443, -41.4879, -41.1714, -41.0729, -40.7653, -40.5881, -40.4874, -40.2019, -39.117, -38.9338, -38.9167, -38.5818, -38.4041, -38.3484, -38.2984, -37.9721, -37.9112, -37.7799, -37.377, -37.3719, -37.1938, -36.3448, -36.3389, -36.3126, -36.1591, -36.1262, -36.0249, -35.9004, -35.8607, -35.8515, -35.6044, -35.3464, -35.0977, -35.0387, -34.9215, -34.2182, -33.6869, -33.5481, -33.528, -32.7191, -32.5101, -32.4126, -32.4109, -32.134, -32.0494, -31.5315, -31.5092, -31.4343, -31.3197, -31.1853, -30.9935, -30.9507, -30.6823, -30.6526, -30.5715, -30.3434, -30.3117, -30.2367, -30.1494, -29.6979, -29.6072, -29.5106, -29.07, -28.8166, -28.7204, -28.3291, -28.2029, -28.1336, -28.028, -28.002, -27.9848, -27.8907, -27.8863, -27.4792, -27.3569, -27.2948, -27.0427, -26.9387, -26.7801, -26.6092, -26.3943, -26.3083, -26.308, -26.007, -25.9629, -25.8718, -25.779, -25.7206, -25.6339, -25.6222, -25.6048, -25.3373, -25.095, -25.0758, -25.043, -24.9956, -24.9707, -24.9232, -24.6513, -24.6295, -24.5518, -24.4249, -24.3405, -24.2282, -24.1708, -24.1533, -24.0714, -24.0393, -23.7919, -23.7898, -23.7093, -23.6332, -23.6275, -23.5371, -23.5297, -23.3796, -23.0257, -22.9341, -22.92, -22.8784, -22.8325, -22.7528, -22.5948, -22.5512, -22.4285, -22.3781, -22.3191, -22.3178, -22.2304, -22.0842, -22.0555, -22.0212, -21.7422, -21.6708, -21.6454, -21.5252, -21.2043, -21.058, -21.045, -20.8518, -20.7616, -20.7472, -20.6601, -20.5936, -20.5853, -20.464, -20.4239, -20.3984, -20.3454, -20.3393, -20.3273, -20.2286, -20.0153]':
+                    return {
+                pane: 'pane_procentowezmianywudzialerzekimidzylatami2024i1990_7',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(245,175,18,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '[-19.8583, -19.7258, -19.6072, -19.599, -19.4272, -19.2842, -19.2788, -19.1564, -19.1169, -19.0532, -18.9291, -18.7682, -18.7131, -18.7126, -18.4698, -18.342, -18.2895, -18.1216, -18.0934, -17.8749, -17.862, -17.8005, -17.7142, -17.7112, -17.5982, -17.5586, -17.4664, -17.42, -17.3131, -17.1987, -17.1728, -17.1233, -17.1128, -16.9717, -16.9194, -16.9141, -16.8827, -16.6759, -16.6726, -16.5307, -16.3413, -16.2183, -16.1933, -16.1718, -16.0318, -16.0183, -15.9734, -15.9037, -15.8878, -15.736, -15.707, -15.6967, -15.6936, -15.6485, -15.5089, -15.4693, -15.4074, -15.3964, -15.3796, -15.3639, -15.3084, -15.1653, -15.1337, -15.098, -15.0273, -14.9846, -14.9744, -14.9629, -14.8864, -14.8677, -14.5989, -14.4426, -14.3452, -14.3147, -14.2825, -14.1826, -14.1094, -13.9961, -13.9568, -13.934, -13.8576, -13.8228, -13.7789, -13.7238, -13.6431, -13.6272, -13.6176, -13.5941, -13.57, -13.5689, -13.4157, -13.3742, -13.3623, -13.3528, -13.1686, -13.067, -13.0478, -12.9873, -12.9147, -12.9109, -12.8988, -12.719, -12.7174, -12.624, -12.5951, -12.5389, -12.4705, -12.4589, -12.4516, -12.2968, -12.0572, -11.9828, -11.9084, -11.6852, -11.6053, -11.529, -11.4351, -11.4322, -11.412, -11.4104, -11.3966, -11.3621, -11.3361, -11.3166, -11.2868, -11.2641, -11.199, -11.1769, -11.0591, -11.0576, -11.0489, -10.9359, -10.934, -10.8718, -10.8532, -10.8393, -10.7563, -10.7058, -10.6762, -10.657, -10.6406, -10.5974, -10.4962, -10.4907, -10.3625, -10.1785, -10.1775, -10.1764, -10.1497, -10.1277, -9.99803, -9.99734, -9.92867, -9.86222, -9.78892, -9.73177, -9.66404, -9.59954, -9.45394, -9.45328, -9.37423, -9.24909, -9.19474, -9.06937, -9.02524, -8.82664, -8.8151, -8.79458, -8.71431, -8.71063, -8.54956, -8.39293, -8.32273, -8.32192, -8.30158, -8.29891, -8.23216, -8.21321, -8.1062, -8.09686, -8.07795, -8.07473, -8.02366, -8.02197, -7.95682, -7.8288, -7.62912, -7.49741, -7.21557, -7.07779, -7.07159, -7.0636, -7.05451, -7.03105, -7.00888, -6.97005, -6.95739, -6.92799, -6.81679, -6.81396, -6.80453, -6.79098, -6.70978, -6.63552, -6.59789, -6.59123, -6.58962, -6.45208, -6.42801, -6.42178, -6.32101, -6.31427, -6.20248, -6.16186, -6.05057, -5.98523, -5.95525, -5.94578, -5.90046, -5.86835, -5.77598, -5.76875, -5.74365, -5.70858, -5.53722, -5.4893, -5.48288, -5.48022, -5.4799, -5.47623, -5.4353, -5.38315, -5.35783, -5.32457, -5.28427, -5.19975, -5.19448, -5.14555, -5.12406, -5.0551, -5.05192, -4.98711, -4.98389, -4.91904, -4.85092, -4.81031, -4.75318, -4.74863, -4.6936, -4.68815, -4.61345, -4.57597, -4.48809, -4.44078, -4.40458, -4.40107, -4.38262, -4.34507, -4.31212, -4.30134, -4.21361, -4.17955, -4.16739, -4.1276, -4.11437, -4.0443, -4.03263, -4.02272, -3.99009, -3.96429, -3.93031, -3.87677, -3.85547, -3.85001, -3.84352, -3.82314, -3.8084, -3.77677, -3.75624, -3.72769, -3.72745, -3.65436, -3.61705, -3.60933, -3.48922, -3.43559, -3.42667, -3.37504, -3.33927, -3.30013, -3.29627, -3.27006, -3.23452, -3.20712, -3.17261, -3.17185, -3.15667, -3.08652, -3.05524, -3.00815, -2.98278, -2.95912, -2.95364, -2.94875, -2.92545, -2.83081, -2.81039, -2.77734, -2.74823, -2.74309, -2.71812, -2.66669, -2.63569, -2.62891, -2.62086, -2.5912, -2.45808, -2.4567, -2.35126, -2.35068, -2.24436, -2.2436, -2.17872, -2.12173, -2.09926, -2.08798, -1.92639, -1.90916, -1.90006, -1.88716, -1.83148, -1.75995, -1.75574, -1.72763, -1.72285, -1.71075, -1.69335, -1.68257, -1.6584, -1.52038, -1.48262, -1.44348, -1.39855, -1.37623, -1.34111, -1.30543, -1.2648, -1.26322, -1.23252, -1.21722, -1.19858, -1.14791, -1.1314, -1.11559, -1.11244, -1.08177, -1.04756, -1.02331, -0.974989, -0.928459, -0.90908, -0.855317, -0.851543, -0.849483, -0.819112, -0.789062, -0.784494, -0.746362, -0.739226, -0.732516, -0.684446, -0.63734, -0.526433, -0.519623, -0.49506, -0.494257, -0.48368, -0.478259, -0.449952, -0.449358, -0.437056, -0.375718, -0.371099, -0.366742, -0.335829, -0.327465, -0.303315, -0.279378, -0.257538, -0.255657, -0.240746, -0.240533, -0.237464, -0.178845, -0.17839, -0.177122, -0.174252, -0.149291, -0.130487, -0.105429, -0.101415, -0.0960181, -0.0929145, -0.0912922, -0.0754359, -0.0736593, -0.0603351, -0.05584, -0.047022, -0.0149354, -0.0135894, -0.0126358, -0.0103243, -0.00793525, -0.00413232, -0.000422479, -4e-10]':
+                    return {
+                pane: 'pane_procentowezmianywudzialerzekimidzylatami2024i1990_7',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(246,236,105,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '[2.86639e-05, 7.04407e-05, 0.00451323, 0.0531745, 0.0864696, 0.0987958, 0.129901, 0.158296, 0.170406, 0.184539, 0.254163, 0.259024, 0.263185, 0.375471, 0.375728, 0.379303, 0.439621, 0.490594, 0.517697, 0.52322, 0.578294, 0.65949, 0.704013, 0.743434, 0.781989, 0.797863, 0.829754, 0.865572, 0.913446, 1.05828, 1.07225, 1.08078, 1.14539, 1.14998, 1.24908, 1.26407, 1.2698, 1.30687, 1.33169, 1.3319, 1.40423, 1.42691, 1.44017, 1.47084, 1.47795, 1.58761, 1.66487, 1.72081, 1.73466, 1.76238, 2.06857, 2.12683, 2.15788, 2.15845, 2.4294, 2.46995, 2.50045, 2.63655, 2.66738, 2.74468, 2.80362, 2.84534, 2.96715, 3.00477, 3.00769, 3.14147, 3.23701, 3.25024, 3.35524, 3.36086, 3.38811, 3.4359, 3.60937, 3.65105, 3.6792, 3.75098, 3.82662, 3.84749, 3.85619, 3.85865, 3.86185, 3.88464, 3.89176, 3.9169, 4.03665, 4.1602, 4.21749, 4.28741, 4.37403, 4.3973, 4.51177, 4.51779, 4.61141, 5.01658, 5.02509, 5.06234, 5.08675, 5.13714, 5.23024, 5.33116, 5.46465, 5.78229, 5.83901, 6.04334, 6.14166, 6.14954, 6.24994, 6.34294, 6.37762, 6.44007, 6.45444, 6.61655, 6.79752, 6.80739, 6.90904, 7.03459, 7.21821, 7.24671, 7.27763, 7.32144, 7.35237, 7.40205, 7.49111, 7.55353, 7.56801, 7.82013, 7.99685, 8.00064, 8.01661, 8.03743, 8.1689, 8.2096, 8.30872, 8.48727, 8.49449, 8.49863, 8.56031, 8.68445, 9.2256, 9.23426, 9.44654, 9.58606, 9.60171, 9.94551, 10.0182, 10.563, 10.8431, 11.1375, 11.2437, 11.3368, 11.3505, 11.3615, 11.3882, 11.5133, 11.55, 11.6221, 11.8681, 11.9711, 11.9872, 12.0524, 12.2595, 12.2976, 12.4493, 12.5417, 12.5873, 12.5933, 12.7372, 13.038, 13.4405, 13.5135, 13.5432, 13.816, 13.838, 14.6837, 14.8385, 14.8898]':
+                    return {
+                pane: 'pane_procentowezmianywudzialerzekimidzylatami2024i1990_7',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(118,217,233,1.0)',
+                interactive: true,
+            }
+                    break;
+                case '[15.1766, 15.7939, 16.3099, 16.5888, 16.7963, 17.1466, 17.5605, 17.7054, 17.8728, 18.1331, 19.9238, 21.3165, 21.345, 21.8124, 21.9051, 22.1465, 22.3005, 22.3458, 22.7939, 23.024, 23.4849, 23.5771, 23.9937, 25.3499, 25.9892, 26.2222, 27.9153, 30.5176]':
+                    return {
+                pane: 'pane_procentowezmianywudzialerzekimidzylatami2024i1990_7',
+                opacity: 1,
+                color: 'rgba(35,35,35,1.0)',
+                dashArray: '',
+                lineCap: 'butt',
+                lineJoin: 'miter',
+                weight: 1.0, 
+                fill: true,
+                fillOpacity: 1,
+                fillColor: 'rgba(42,123,164,1.0)',
+                interactive: true,
+            }
+                    break;
+            }
+        }
+        map.createPane('pane_procentowezmianywudzialerzekimidzylatami2024i1990_7');
+        map.getPane('pane_procentowezmianywudzialerzekimidzylatami2024i1990_7').style.zIndex = 407;
+        map.getPane('pane_procentowezmianywudzialerzekimidzylatami2024i1990_7').style['mix-blend-mode'] = 'normal';
+        var layer_procentowezmianywudzialerzekimidzylatami2024i1990_7 = new L.geoJson(json_procentowezmianywudzialerzekimidzylatami2024i1990_7, {
+            attribution: '',
+            interactive: true,
+            dataVar: 'json_procentowezmianywudzialerzekimidzylatami2024i1990_7',
+            layerName: 'layer_procentowezmianywudzialerzekimidzylatami2024i1990_7',
+            pane: 'pane_procentowezmianywudzialerzekimidzylatami2024i1990_7',
+            onEachFeature: pop_procentowezmianywudzialerzekimidzylatami2024i1990_7,
+            style: style_procentowezmianywudzialerzekimidzylatami2024i1990_7_0,
+        });
+        bounds_group.addLayer(layer_procentowezmianywudzialerzekimidzylatami2024i1990_7);
+        map.addLayer(layer_procentowezmianywudzialerzekimidzylatami2024i1990_7);
+        var osmGeocoder = new L.Control.Geocoder({
+            collapsed: true,
+            position: 'topleft',
+            text: 'Search',
+            title: 'Testing'
+        }).addTo(map);
+        document.getElementsByClassName('leaflet-control-geocoder-icon')[0]
+        .className += ' fa fa-search';
+        document.getElementsByClassName('leaflet-control-geocoder-icon')[0]
+        .title += 'Search for a place';
+        var overlaysTree = [
+            {label: 'procentowe zmiany w udziale rzeki między latami 2024 i 1990<br /><table><tr><td style="text-align: center;"><img src="legend/procentowezmianywudzialerzekimidzylatami2024i1990_7_86600.png" /></td><td>-86% - -60%</td></tr><tr><td style="text-align: center;"><img src="legend/procentowezmianywudzialerzekimidzylatami2024i1990_7_60201.png" /></td><td>-60% - -20%</td></tr><tr><td style="text-align: center;"><img src="legend/procentowezmianywudzialerzekimidzylatami2024i1990_7_2002.png" /></td><td>-20% - 0%</td></tr><tr><td style="text-align: center;"><img src="legend/procentowezmianywudzialerzekimidzylatami2024i1990_7_0153.png" /></td><td>0% - 15%</td></tr><tr><td style="text-align: center;"><img src="legend/procentowezmianywudzialerzekimidzylatami2024i1990_7_15304.png" /></td><td>15% - 30%</td></tr></table>', layer: layer_procentowezmianywudzialerzekimidzylatami2024i1990_7},
+            {label: 'procetowe zmiany w udziale rzeki między latami 1990 i 1940<br /><table><tr><td style="text-align: center;"><img src="legend/procetowezmianywudzialerzekimidzylatami1990i1940_6_100600.png" /></td><td>-100% - -60%</td></tr><tr><td style="text-align: center;"><img src="legend/procetowezmianywudzialerzekimidzylatami1990i1940_6_60201.png" /></td><td>-60% - -20%</td></tr><tr><td style="text-align: center;"><img src="legend/procetowezmianywudzialerzekimidzylatami1990i1940_6_2002.png" /></td><td>-20%- 0%</td></tr><tr><td style="text-align: center;"><img src="legend/procetowezmianywudzialerzekimidzylatami1990i1940_6_0203.png" /></td><td>0% - 20%</td></tr><tr><td style="text-align: center;"><img src="legend/procetowezmianywudzialerzekimidzylatami1990i1940_6_20604.png" /></td><td>20% - 60%</td></tr><tr><td style="text-align: center;"><img src="legend/procetowezmianywudzialerzekimidzylatami1990i1940_6_601005.png" /></td><td>60% - 100%</td></tr></table>', layer: layer_procetowezmianywudzialerzekimidzylatami1990i1940_6},
+            {label: '<img src="legend/miejscagdzierzekazawszepyna_5.png" /> miejsca, gdzie rzeka zawsze płynęła', layer: layer_miejscagdzierzekazawszepyna_5},
+            {label: '<img src="legend/miejscagdzierzekapynaprzynajmniejraz_4.png" /> miejsca, gdzie rzeka płynęła przynajmniej raz', layer: layer_miejscagdzierzekapynaprzynajmniejraz_4},
+            {label: '<img src="legend/przebiegrzekiz2024roku_3.png" /> przebieg rzeki z 2024 roku', layer: layer_przebiegrzekiz2024roku_3},
+            {label: '<img src="legend/przebiegrzekiz1990roku_2.png" /> przebieg rzeki z 1990 roku', layer: layer_przebiegrzekiz1990roku_2},
+            {label: '<img src="legend/przebiegrzekiz1940roku_1.png" /> przebieg rzeki z 1940 roku', layer: layer_przebiegrzekiz1940roku_1},
+            {label: "ORTOFOTOMAPA", layer: layer_ORTOFOTOMAPA_0, radioGroup: 'bm' },]
+        var lay = L.control.layers.tree(null, overlaysTree,{
+            //namedToggle: true,
+            //selectorBack: false,
+            //closedSymbol: '&#8862; &#x1f5c0;',
+            //openedSymbol: '&#8863; &#x1f5c1;',
+            //collapseAll: 'Collapse all',
+            //expandAll: 'Expand all',
+            collapsed: true,
+        });
+        lay.addTo(map);
+        setBounds();
+        </script>
+    </body>
+</html>
